@@ -9,7 +9,9 @@ import io
 app = Flask(__name__)
 
 # CONFIG
-API_KEY = "eXF6yb5ORvC0hHvDe2g3cZDB2E4sGiJx2MSaYFjdsf4"   # <-- metti qui la tua API Unwatermark
+import os
+
+API_KEY = os.environ.get("UNWATER_API_KEY")
 UNWATER_ENDPOINT = "https://api.unwatermark.ai/v1/image/remove-watermark"
 USE_UNWATERMARK = True
 
