@@ -1,17 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
-    <meta charset="utf-8">
-    <title>Scarica Galleria Auto</title>
+    <meta charset="UTF-8">
+    <title>Test Unwatermark</title>
 </head>
 <body>
-    <h1>Scarica Immagini Auto DealerK</h1>
-
-    <form method="post">
-        <label>Inserisci URL auto DealerK:</label><br>
-        <input type="text" name="url" size="70" required>
-        <br><br>
-        <button type="submit">Scarica e Processa</button>
+    <h1>Test Unwatermark API</h1>
+    <form method="post" enctype="multipart/form-data">
+        <label>Carica un’immagine:</label>
+        <input type="file" name="image" required>
+        <button type="submit">Rimuovi sfondo / watermark</button>
     </form>
+    {% if result_url %}
+        <h2>Risultato:</h2>
+        <a href="{{ result_url }}" download>Scarica immagine modificata</a>
+    {% endif %}
 </body>
 </html>
