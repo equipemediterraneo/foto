@@ -11,7 +11,6 @@
             justify-content: center;
             padding-top: 50px;
         }
-
         .container {
             background-color: #fff;
             padding: 30px 40px;
@@ -20,12 +19,10 @@
             width: 500px;
             text-align: center;
         }
-
         img.logo {
             max-width: 200px;
             margin-bottom: 20px;
         }
-
         input[type=text] {
             width: 90%;
             padding: 10px;
@@ -34,7 +31,6 @@
             border-radius: 6px;
             font-size: 14px;
         }
-
         input[type=submit] {
             background-color: #007bff;
             color: #fff;
@@ -45,11 +41,9 @@
             cursor: pointer;
             transition: background-color 0.3s;
         }
-
         input[type=submit]:hover {
             background-color: #0056b3;
         }
-
         a.download-link {
             display: inline-block;
             margin-top: 20px;
@@ -61,11 +55,9 @@
             font-weight: bold;
             transition: background-color 0.3s;
         }
-
         a.download-link:hover {
             background-color: #1e7e34;
         }
-
         p.error {
             color: red;
             font-weight: bold;
@@ -75,11 +67,8 @@
 </head>
 <body>
     <div class="container">
-        <!-- Logo cliente -->
         <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Cliente" class="logo">
-
         <h1>IRMA CARS - Processa Galleria Auto</h1>
-
         <form method="post">
             <input type="text" name="url" placeholder="Inserisci LINK pagina auto" required>
             <br>
