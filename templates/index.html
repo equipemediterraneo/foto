@@ -1,116 +1,42 @@
 <!DOCTYPE html>
-<html lang="it">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>IRMA CARS - Processa Galleria Auto</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
-            display: flex;
-            justify-content: center;
-            padding-top: 50px;
-        }
-        .container {
-            background-color: #fff;
-            padding: 30px 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 500px;
-            text-align: center;
-        }
-        img.logo {
-            max-width: 200px;
-            margin-bottom: 20px;
-        }
-        input[type=text] {
-            width: 90%;
-            padding: 10px;
-            margin: 15px 0;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-        input[type=submit] {
-            background-color: #007bff;
-            color: #fff;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        input[type=submit]:hover {
-            background-color: #0056b3;
-        }
-        a.download-link {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: #fff;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        a.download-link:hover {
-            background-color: #1e7e34;
-        }
-        p.error {
-            color: red;
-            font-weight: bold;
-            margin-top: 15px;
-        }
-    </style>
+<meta charset="utf-8">
+<title>IRMA CARS - Scaricare galleria auto</title>
+<style>
+body { font-family: Arial, sans-serif; max-width: 700px; margin: 50px auto; }
+h1 { text-align: center; }
+form { margin-top: 30px; text-align: center; }
+input[type="text"] { width: 80%; padding: 10px; font-size: 16px; }
+input[type="submit"] { padding: 10px 20px; font-size: 16px; }
+.progress { width: 80%; height: 20px; background: #eee; margin: 20px auto; border-radius: 5px; }
+.progress-bar { width: 0%; height: 100%; background: #4caf50; border-radius: 5px; }
+.logo { display: block; margin: 0 auto 20px; width: 200px; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Cliente" class="logo">
-        <h1>IRMA CARS - Processa Galleria Auto</h1>
-       <form id="processForm" method="post">
-    <input type="text" name="url" placeholder="Inserisci LINK pagina auto" required>
-    <br>
-    <input type="submit" value="Scarica e processa immagini">
+<img src="{{ url_for('static', filename='logo.png') }}" class="logo">
+<h1>IRMA CARS - Scaricare galleria auto</h1>
+<form method="post" onsubmit="showProgress()">
+    <input type="text" name="url" placeholder="https://..." required><br><br>
+    <input type="submit" value="Scarica immagini">
 </form>
-
-<!-- Messaggio e barra di avanzamento -->
-<div id="processing" style="display:none; margin-top:20px;">
-    <p>⏳ Processando le immagini, attendere...</p>
-    <div style="width:100%; background:#eee; border-radius:6px; overflow:hidden;">
-        <div id="progress-bar" style="width:0%; height:10px; background:#007bff;"></div>
-    </div>
+<div class="progress" id="progress" style="display:none;">
+    <div class="progress-bar" id="bar"></div>
 </div>
-
-        {% if result_url %}
-            <a href="{{ result_url }}" class="download-link" download>Scarica ZIP con immagini processate</a>
-        {% endif %}
-        {% if error %}
-            <p class="error">{{ error }}</p>
-        {% endif %}
-    </div>
-</body>
+<p id="status" style="text-align:center;"></p>
 <script>
-    const form = document.getElementById("processForm");
-    const processingDiv = document.getElementById("processing");
-    const progressBar = document.getElementById("progress-bar");
-
-    form.addEventListener("submit", function() {
-        // Mostra messaggio
-        processingDiv.style.display = "block";
-
-        // Simula avanzamento della barra (solo estetico)
-        let width = 0;
-        const interval = setInterval(() => {
-            if (width >= 90) {  // ferma a 90%, il resto lo completa il server
-                clearInterval(interval);
-            } else {
-                width += 5;
-                progressBar.style.width = width + "%";
-            }
-        }, 500);
-    });
+function showProgress() {
+    document.getElementById('progress').style.display = 'block';
+    document.getElementById('status').innerText = 'Processando immagini... Questo potrebbe richiedere alcuni minuti.';
+    var bar = document.getElementById('bar');
+    var width = 0;
+    var interval = setInterval(function() {
+        if(width >= 100) clearInterval(interval);
+        bar.style.width = width + '%';
+        width += 1;
+    }, 100);
+}
 </script>
-
+</body>
 </html>
