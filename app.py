@@ -1,82 +1,90 @@
 from flask import Flask, request, render_template, send_file
-import requests
-import os
+import requests, os, zipfile, uuid
+from bs4 import BeautifulSoup
 from io import BytesIO
-from zipfile import ZipFile
-import re
-from urllib.parse import urlparse
 
 app = Flask(__name__)
 
-# Inserisci la tua API Key nelle environment variables su Render
-API_KEY = os.environ.get("UNWATER_API_KEY")
-UNWATER_ENDPOINT = "https://api.unwatermark.ai/api/unwatermark/api/v1/auto-unWaterMark"
+import os
 
-def fetch_html(url):
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    return r.text if r.status_code == 200 else ""
+# Legge la API Key dalla variabile d'ambiente
+API_KEY = os.environ.get("ZF_API_KEY")
 
-def fetch_image(url):
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    return r.content if r.status_code == 200 else None
+if not API_KEY:
+    raise ValueError("Variabile d'ambiente ZF_API_KEY non impostata")
 
-def process_unwatermark(img_bytes):
-    files = {"original_image_file": ("image.jpg", img_bytes)}
-    headers = {"ZF-API-KEY": API_KEY}
-
-    r = requests.post(UNWATER_ENDPOINT, files=files, headers=headers)
-    if r.status_code == 200:
-        data = r.json()
-        if "result" in data and "output_image_url" in data["result"]:
-            output_url = data["result"]["output_image_url"]
-            img_response = requests.get(output_url)
-            if img_response.status_code == 200:
-                return img_response.content
-    return None
-
-def extract_image_urls(html):
-    matches = re.findall(
-        r'https://cdn\.dealerk\.it/dealer/datafiles/vehicle/images/800x0/[^"\']+\.(?:jpg|jpeg|png)', html, re.I
-    )
-    return list(set(matches))  # rimuove duplicati
+MAX_IMAGES = 10
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    result_url = None
-    error = None
-
     if request.method == "POST":
         url = request.form.get("url")
-        if url:
-            html = fetch_html(url)
-            image_urls = extract_image_urls(html)[:10]  # Limita a massimo 10 immagini
+        if not url:
+            return "Inserisci un URL valido", 400
 
-            if not image_urls:
-                error = "Nessuna immagine trovata."
-            else:
-                zip_buffer = BytesIO()
-                with ZipFile(zip_buffer, "w") as zip_file:
-                    for img_url in image_urls:
-                        img_bytes = fetch_image(img_url)
-                        if img_bytes:
-                            processed_bytes = process_unwatermark(img_bytes)
-                            if processed_bytes:
-                                filename = os.path.basename(urlparse(img_url).path)
-                                zip_file.writestr(filename, processed_bytes)
+        # Cartella temporanea per il processo
+        tmp_dir = os.path.join("tmp", str(uuid.uuid4()))
+        os.makedirs(tmp_dir, exist_ok=True)
 
-                zip_buffer.seek(0)
-                tmp_zip_path = "processed_images.zip"
-                with open(tmp_zip_path, "wb") as f:
-                    f.write(zip_buffer.read())
+        # Scarica HTML della pagina
+        resp = requests.get(url)
+        soup = BeautifulSoup(resp.text, "html.parser")
 
-                result_url = tmp_zip_path
+        # Trova immagini (JPG, PNG, WebP)
+        img_urls = []
+        for img in soup.find_all("img"):
+            src = img.get("src")
+            if src and src.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                img_urls.append(src)
 
-    return render_template("index.html", result_url=result_url, error=error)
+        img_urls = list(dict.fromkeys(img_urls))[:MAX_IMAGES]
 
-@app.route("/<filename>")
-def download(filename):
-    return send_file(filename, as_attachment=True)
+        # Scarica immagini e processa con API unwatermark
+        processed_files = []
+        for src in img_urls:
+            filename = os.path.basename(src.split("?")[0])
+            filename = filename.replace("/", "_")
+            local_path = os.path.join(tmp_dir, filename)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+            # Scarica immagine originale
+            r = requests.get(src)
+            with open(local_path, "wb") as f:
+                f.write(r.content)
 
+            # Invia all'API unwatermark
+            files = {"original_image_file": open(local_path, "rb")}
+            headers = {"ZF-API-KEY": API_KEY}
+            api_resp = requests.post(
+                "https://api.unwatermark.ai/api/unwatermark/api/v1/auto-unWaterMark",
+                headers=headers,
+                files=files
+            )
+            data = api_resp.json()
+            output_url = data.get("result", {}).get("output_image_url")
+
+            # Scarica immagine processata
+            if output_url:
+                r2 = requests.get(output_url)
+                processed_path = os.path.join(tmp_dir, "processed_" + filename)
+                with open(processed_path, "wb") as f:
+                    f.write(r2.content)
+                processed_files.append(processed_path)
+
+        # Crea ZIP finale
+        zip_io = BytesIO()
+        with zipfile.ZipFile(zip_io, mode="w") as zf:
+            for file_path in processed_files:
+                zf.write(file_path, os.path.basename(file_path))
+        zip_io.seek(0)
+
+        # Pulizia cartella temporanea opzionale
+        # shutil.rmtree(tmp_dir)
+
+        return send_file(
+            zip_io,
+            mimetype="application/zip",
+            download_name="foto_modificate.zip",
+            as_attachment=True
+        )
+
+    return render_template("index.html")
