@@ -69,11 +69,19 @@
     <div class="container">
         <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Cliente" class="logo">
         <h1>IRMA CARS - Processa Galleria Auto</h1>
-        <form method="post">
-            <input type="text" name="url" placeholder="Inserisci LINK pagina auto" required>
-            <br>
-            <input type="submit" value="Scarica e processa immagini">
-        </form>
+       <form id="processForm" method="post">
+    <input type="text" name="url" placeholder="Inserisci LINK pagina auto" required>
+    <br>
+    <input type="submit" value="Scarica e processa immagini">
+</form>
+
+<!-- Messaggio e barra di avanzamento -->
+<div id="processing" style="display:none; margin-top:20px;">
+    <p>⏳ Processando le immagini, attendere...</p>
+    <div style="width:100%; background:#eee; border-radius:6px; overflow:hidden;">
+        <div id="progress-bar" style="width:0%; height:10px; background:#007bff;"></div>
+    </div>
+</div>
 
         {% if result_url %}
             <a href="{{ result_url }}" class="download-link" download>Scarica ZIP con immagini processate</a>
@@ -83,4 +91,26 @@
         {% endif %}
     </div>
 </body>
+<script>
+    const form = document.getElementById("processForm");
+    const processingDiv = document.getElementById("processing");
+    const progressBar = document.getElementById("progress-bar");
+
+    form.addEventListener("submit", function() {
+        // Mostra messaggio
+        processingDiv.style.display = "block";
+
+        // Simula avanzamento della barra (solo estetico)
+        let width = 0;
+        const interval = setInterval(() => {
+            if (width >= 90) {  // ferma a 90%, il resto lo completa il server
+                clearInterval(interval);
+            } else {
+                width += 5;
+                progressBar.style.width = width + "%";
+            }
+        }, 500);
+    });
+</script>
+
 </html>
