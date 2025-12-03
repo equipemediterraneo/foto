@@ -2,18 +2,96 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Test Unwatermark</title>
+    <title>IRMA CARS - Processa Galleria Auto</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: center;
+            padding-top: 50px;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 500px;
+            text-align: center;
+        }
+
+        img.logo {
+            max-width: 200px;
+            margin-bottom: 20px;
+        }
+
+        input[type=text] {
+            width: 90%;
+            padding: 10px;
+            margin: 15px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input[type=submit] {
+            background-color: #007bff;
+            color: #fff;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        input[type=submit]:hover {
+            background-color: #0056b3;
+        }
+
+        a.download-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: #fff;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+        a.download-link:hover {
+            background-color: #1e7e34;
+        }
+
+        p.error {
+            color: red;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Test Unwatermark API</h1>
-    <form method="post" enctype="multipart/form-data">
-        <label>Carica un’immagine:</label>
-        <input type="file" name="image" required>
-        <button type="submit">Rimuovi sfondo / watermark</button>
-    </form>
-    {% if result_url %}
-        <h2>Risultato:</h2>
-        <a href="{{ result_url }}" download>Scarica immagine modificata (ZIP)</a>
-    {% endif %}
+    <div class="container">
+        <!-- Logo cliente -->
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Cliente" class="logo">
+
+        <h1>IRMA CARS - Processa Galleria Auto</h1>
+
+        <form method="post">
+            <input type="text" name="url" placeholder="Inserisci LINK pagina auto" required>
+            <br>
+            <input type="submit" value="Scarica e processa immagini">
+        </form>
+
+        {% if result_url %}
+            <a href="{{ result_url }}" class="download-link" download>Scarica ZIP con immagini processate</a>
+        {% endif %}
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+    </div>
 </body>
 </html>
