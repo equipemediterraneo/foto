@@ -1,17 +1,14 @@
 from flask import Flask, request, render_template, send_file
-import requests, os, zipfile, uuid
+import requests, os, zipfile, uuid, shutil
 from bs4 import BeautifulSoup
 from io import BytesIO
 
 app = Flask(__name__)
 
-import os
-
 # Legge la API Key dalla variabile d'ambiente
-API_KEY = os.environ.get("ZF_API_KEY")
-
+API_KEY = os.environ.get("UNWATER_API_KEY")
 if not API_KEY:
-    raise ValueError("Variabile d'ambiente ZF_API_KEY non impostata")
+    raise ValueError("Variabile d'ambiente UNWATER_API_KEY non impostata")
 
 MAX_IMAGES = 10
 
@@ -52,13 +49,14 @@ def index():
                 f.write(r.content)
 
             # Invia all'API unwatermark
-            files = {"original_image_file": open(local_path, "rb")}
-            headers = {"ZF-API-KEY": API_KEY}
-            api_resp = requests.post(
-                "https://api.unwatermark.ai/api/unwatermark/api/v1/auto-unWaterMark",
-                headers=headers,
-                files=files
-            )
+            with open(local_path, "rb") as f:
+                files = {"original_image_file": f}
+                headers = {"ZF-API-KEY": API_KEY}
+                api_resp = requests.post(
+                    "https://api.unwatermark.ai/api/unwatermark/api/v1/auto-unWaterMark",
+                    headers=headers,
+                    files=files
+                )
             data = api_resp.json()
             output_url = data.get("result", {}).get("output_image_url")
 
@@ -77,8 +75,8 @@ def index():
                 zf.write(file_path, os.path.basename(file_path))
         zip_io.seek(0)
 
-        # Pulizia cartella temporanea opzionale
-        # shutil.rmtree(tmp_dir)
+        # Pulizia cartella temporanea
+        shutil.rmtree(tmp_dir)
 
         return send_file(
             zip_io,
