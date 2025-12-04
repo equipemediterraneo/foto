@@ -2,6 +2,7 @@ from flask import Flask, request, render_template, send_file
 import os, uuid, zipfile, shutil, re, requests
 from io import BytesIO
 from bs4 import BeautifulSoup
+from time import sleep
 
 app = Flask(__name__)
 
@@ -10,6 +11,8 @@ if not API_KEY:
     raise ValueError("Variabile d'ambiente UNWATER_API_KEY non impostata")
 
 MAX_IMAGES = 10
+DOWNLOAD_RETRIES = 3
+DOWNLOAD_TIMEOUT = 15
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -23,13 +26,12 @@ def index():
         os.makedirs(tmp_dir, exist_ok=True)
 
         # Scarica HTML
-try:
-    resp = requests.get(url, timeout=15)
-    resp.raise_for_status()  # solleva errori HTTP
-except requests.exceptions.RequestException as e:
-    return f"Errore durante il download della pagina: {e}", 400
-
-        html = resp.text
+        try:
+            resp = requests.get(url, timeout=DOWNLOAD_TIMEOUT)
+            resp.raise_for_status()
+            html = resp.text
+        except requests.exceptions.RequestException as e:
+            return f"Errore durante il download della pagina: {e}", 400
 
         # Trova immagini DealerK 800x0 con estensione webp/jpg/jpeg/png
         all_imgs = re.findall(
@@ -52,35 +54,58 @@ except requests.exceptions.RequestException as e:
 
         # Scarica e processa immagini
         processed_files = []
+        skipped_files = []
+
         for src in img_urls:
             filename = os.path.basename(src.split("?")[0])
             filename = filename.replace("/", "_")
             local_path = os.path.join(tmp_dir, filename)
 
-            # Scarica immagine
-            r = requests.get(src)
-            with open(local_path, "wb") as f:
-                f.write(r.content)
+            # Download immagine con retry
+            success = False
+            for attempt in range(DOWNLOAD_RETRIES):
+                try:
+                    r = requests.get(src, timeout=DOWNLOAD_TIMEOUT)
+                    r.raise_for_status()
+                    with open(local_path, "wb") as f:
+                        f.write(r.content)
+                    success = True
+                    break
+                except requests.exceptions.RequestException:
+                    sleep(1)  # breve attesa prima del retry
+            if not success:
+                skipped_files.append(filename)
+                continue
 
             # Invia all'API unwatermark
-            with open(local_path, "rb") as f:
-                files = {"original_image_file": f}
-                headers = {"ZF-API-KEY": API_KEY}
-                api_resp = requests.post(
-                    "https://api.unwatermark.ai/api/unwatermark/api/v1/auto-unWaterMark",
-                    headers=headers,
-                    files=files
-                )
-            data = api_resp.json()
-            output_url = data.get("result", {}).get("output_image_url")
+            try:
+                with open(local_path, "rb") as f:
+                    files = {"original_image_file": f}
+                    headers = {"ZF-API-KEY": API_KEY}
+                    api_resp = requests.post(
+                        "https://api.unwatermark.ai/api/unwatermark/api/v1/auto-unWaterMark",
+                        headers=headers,
+                        files=files,
+                        timeout=DOWNLOAD_TIMEOUT
+                    )
+                api_resp.raise_for_status()
+                data = api_resp.json()
+                output_url = data.get("result", {}).get("output_image_url")
+            except requests.exceptions.RequestException:
+                skipped_files.append(filename)
+                continue
 
             # Scarica immagine processata
             if output_url:
-                r2 = requests.get(output_url)
-                processed_path = os.path.join(tmp_dir, "processed_" + filename)
-                with open(processed_path, "wb") as f:
-                    f.write(r2.content)
-                processed_files.append(processed_path)
+                try:
+                    r2 = requests.get(output_url, timeout=DOWNLOAD_TIMEOUT)
+                    r2.raise_for_status()
+                    processed_path = os.path.join(tmp_dir, "processed_" + filename)
+                    with open(processed_path, "wb") as f:
+                        f.write(r2.content)
+                    processed_files.append(processed_path)
+                except requests.exceptions.RequestException:
+                    skipped_files.append(filename)
 
         # Crea ZIP finale
         zip_io = BytesIO()
@@ -92,6 +117,11 @@ except requests.exceptions.RequestException as e:
         # Pulizia cartella temporanea
         shutil.rmtree(tmp_dir)
 
+        # Messaggio log su file saltati
+        log_msg = ""
+        if skipped_files:
+            log_msg = f"\nAlcune immagini non sono state processate: {', '.join(skipped_files)}"
+
         return send_file(
             zip_io,
             mimetype="application/zip",
@@ -101,3 +131,5 @@ except requests.exceptions.RequestException as e:
 
     return render_template("index.html")
 
+if __name__ == "__main__":
+    app.run(debug=True)
