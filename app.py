@@ -1,8 +1,6 @@
 from flask import Flask, request, render_template, send_file
 import os, uuid, zipfile, shutil, re, requests
 from io import BytesIO
-from bs4 import BeautifulSoup
-from time import sleep
 
 app = Flask(__name__)
 
@@ -11,8 +9,16 @@ if not API_KEY:
     raise ValueError("Variabile d'ambiente UNWATER_API_KEY non impostata")
 
 MAX_IMAGES = 10
-DOWNLOAD_RETRIES = 3
-DOWNLOAD_TIMEOUT = 15
+DOWNLOAD_TIMEOUT = 30  # Timeout più alto per download lento
+
+# Headers per simulare browser
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/118.0.5993.117 Safari/537.36",
+    "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+}
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -21,29 +27,31 @@ def index():
         if not url:
             return "Inserisci un URL valido", 400
 
-        # Cartella temporanea
         tmp_dir = os.path.join("tmp", str(uuid.uuid4()))
         os.makedirs(tmp_dir, exist_ok=True)
 
-        # Scarica HTML
+        # Sessione persistente per più richieste
+        session = requests.Session()
+        session.headers.update(HEADERS)
+
+        # Scarica HTML con retry
         try:
-            resp = requests.get(url, timeout=DOWNLOAD_TIMEOUT)
+            resp = session.get(url, timeout=DOWNLOAD_TIMEOUT)
             resp.raise_for_status()
             html = resp.text
         except requests.exceptions.RequestException as e:
             return f"Errore durante il download della pagina: {e}", 400
 
-        # Trova immagini DealerK 800x0 con estensione webp/jpg/jpeg/png
+        # Trova immagini DealerK 800x0 (.webp preferite)
         all_imgs = re.findall(
             r'https://cdn\.dealerk\.it/dealer/datafiles/vehicle/images/800x0/[^"\']+\.(?:webp|jpg|jpeg|png)',
             html,
             re.IGNORECASE
         )
 
-        # Rimuove duplicati
-        all_imgs = list(dict.fromkeys(all_imgs))
+        all_imgs = list(dict.fromkeys(all_imgs))  # rimuove duplicati
 
-        # Lista finale: webp in cima
+        # Webp prima
         img_urls = []
         for img in all_imgs:
             if img.lower().endswith(".webp"):
@@ -52,75 +60,59 @@ def index():
                 img_urls.append(img)
         img_urls = img_urls[:MAX_IMAGES]
 
-        # Scarica e processa immagini
         processed_files = []
-        skipped_files = []
 
         for src in img_urls:
             filename = os.path.basename(src.split("?")[0])
             filename = filename.replace("/", "_")
             local_path = os.path.join(tmp_dir, filename)
 
-            # Download immagine con retry
-            success = False
-            for attempt in range(DOWNLOAD_RETRIES):
-                try:
-                    r = requests.get(src, timeout=DOWNLOAD_TIMEOUT)
-                    r.raise_for_status()
-                    with open(local_path, "wb") as f:
-                        f.write(r.content)
-                    success = True
-                    break
-                except requests.exceptions.RequestException:
-                    sleep(1)  # breve attesa prima del retry
-            if not success:
-                skipped_files.append(filename)
-                continue
+            # Scarica immagine
+            try:
+                r = session.get(src, timeout=DOWNLOAD_TIMEOUT)
+                r.raise_for_status()
+                with open(local_path, "wb") as f:
+                    f.write(r.content)
+            except requests.exceptions.RequestException:
+                continue  # salta immagine se non scaricabile
 
             # Invia all'API unwatermark
             try:
                 with open(local_path, "rb") as f:
                     files = {"original_image_file": f}
-                    headers = {"ZF-API-KEY": API_KEY}
+                    headers_api = {"ZF-API-KEY": API_KEY}
                     api_resp = requests.post(
                         "https://api.unwatermark.ai/api/unwatermark/api/v1/auto-unWaterMark",
-                        headers=headers,
+                        headers=headers_api,
                         files=files,
                         timeout=DOWNLOAD_TIMEOUT
                     )
-                api_resp.raise_for_status()
                 data = api_resp.json()
                 output_url = data.get("result", {}).get("output_image_url")
-            except requests.exceptions.RequestException:
-                skipped_files.append(filename)
+            except Exception:
                 continue
 
             # Scarica immagine processata
             if output_url:
                 try:
-                    r2 = requests.get(output_url, timeout=DOWNLOAD_TIMEOUT)
+                    r2 = session.get(output_url, timeout=DOWNLOAD_TIMEOUT)
                     r2.raise_for_status()
                     processed_path = os.path.join(tmp_dir, "processed_" + filename)
                     with open(processed_path, "wb") as f:
                         f.write(r2.content)
                     processed_files.append(processed_path)
-                except requests.exceptions.RequestException:
-                    skipped_files.append(filename)
+                except Exception:
+                    continue
 
-        # Crea ZIP finale
+        # Crea ZIP
         zip_io = BytesIO()
         with zipfile.ZipFile(zip_io, mode="w") as zf:
             for file_path in processed_files:
                 zf.write(file_path, os.path.basename(file_path))
         zip_io.seek(0)
 
-        # Pulizia cartella temporanea
+        # Pulizia temporanea
         shutil.rmtree(tmp_dir)
-
-        # Messaggio log su file saltati
-        log_msg = ""
-        if skipped_files:
-            log_msg = f"\nAlcune immagini non sono state processate: {', '.join(skipped_files)}"
 
         return send_file(
             zip_io,
@@ -131,5 +123,7 @@ def index():
 
     return render_template("index.html")
 
+
 if __name__ == "__main__":
     app.run(debug=True)
+
