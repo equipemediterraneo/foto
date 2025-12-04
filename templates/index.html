@@ -83,12 +83,12 @@
     </div>
 </div>
 
-        {% if result_url %}
-            <a href="{{ result_url }}" class="download-link" download>Scarica ZIP con immagini processate</a>
-        {% endif %}
-        {% if error %}
-            <p class="error">{{ error }}</p>
-        {% endif %}
+{% if result_url %}
+    <a id="download-zip" href="{{ result_url }}" class="download-link" download>
+        Scarica ZIP con immagini processate
+    </a>
+{% endif %}
+
     </div>
 <script>
 function startSlowProgress() {
@@ -115,8 +115,14 @@ function startSlowProgress() {
 let stopProgress;
 
 document.getElementById("processForm").addEventListener("submit", function() {
+
+    // NASCONDI eventuale vecchio pulsante ZIP
+    const oldZip = document.getElementById("download-zip");
+    if (oldZip) oldZip.style.display = "none";
+
     stopProgress = startSlowProgress();
 });
+
 document.getElementById("processForm").addEventListener("submit", function() {
     // evita doppio invio
     this.querySelector("input[type=submit]").disabled = true;
