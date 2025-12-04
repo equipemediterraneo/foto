@@ -4,152 +4,29 @@
     <meta charset="UTF-8">
     <title>IRMA CARS - Processa Galleria Auto</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f9f9f9;
-            display: flex;
-            justify-content: center;
-            padding-top: 50px;
-        }
-        .container {
-            background-color: #fff;
-            padding: 30px 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 500px;
-            text-align: center;
-        }
-        img.logo {
-            max-width: 200px;
-            margin-bottom: 20px;
-        }
-        input[type=text] {
-            width: 90%;
-            padding: 10px;
-            margin: 15px 0;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-        input[type=submit] {
-            background-color: #007bff;
-            color: #fff;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        input[type=submit]:hover {
-            background-color: #0056b3;
-        }
-        a.download-link {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background-color: #28a745;
-            color: #fff;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        a.download-link:hover {
-            background-color: #1e7e34;
-        }
-        p.error {
-            color: red;
-            font-weight: bold;
-            margin-top: 15px;
-        }
-        #progress-bar {
-            width: 0%;
-            height: 10px;
-            background: #007bff;
-        }
-        #processing { display: none; margin-top: 20px; }
+        body { font-family: Arial, sans-serif; background-color: #f9f9f9; display: flex; justify-content: center; padding-top: 50px; }
+        .container { background-color: #fff; padding: 30px 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 500px; text-align: center; }
+        img.logo { max-width: 200px; margin-bottom: 20px; }
+        input[type=text] { width: 90%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        input[type=submit] { background-color: #007bff; color: #fff; padding: 12px 25px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        input[type=submit]:hover { background-color: #0056b3; }
+        a.download-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #28a745; color: #fff; border-radius: 6px; text-decoration: none; font-weight: bold; transition: background-color 0.3s; }
+        a.download-link:hover { background-color: #1e7e34; }
     </style>
 </head>
 <body>
-<div class="container">
-    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Cliente" class="logo">
-    <h1>IRMA CARS - Processa Galleria Auto</h1>
-    <form id="processForm" method="post">
-        <input type="text" name="url" placeholder="Inserisci LINK pagina auto" required>
-        <br>
-        <input type="submit" value="Scarica e processa immagini">
-    </form>
+    <div class="container">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Cliente" class="logo">
+        <h1>IRMA CARS - Processa Galleria Auto</h1>
+        <form method="post">
+            <input type="text" name="url" placeholder="Inserisci LINK pagina auto" required>
+            <br>
+            <input type="submit" value="Scarica e processa immagini">
+        </form>
 
-    <!-- Messaggio e barra di avanzamento -->
-    <div id="processing">
-        <p>⏳ Processando le immagini, attendere...</p>
-        <div style="width:100%; background:#eee; border-radius:6px; overflow:hidden;">
-            <div id="progress-bar"></div>
-        </div>
+        {% if result_url %}
+            <a href="{{ result_url }}" class="download-link">Scarica ZIP con immagini processate</a>
+        {% endif %}
     </div>
-
-    <div id="download-container" style="display:none;">
-        <a id="download-zip" href="#" class="download-link" download>
-            Scarica ZIP con immagini processate
-        </a>
-    </div>
-</div>
-
-<script>
-function startSlowProgress() {
-    const container = document.getElementById("processing");
-    const bar = document.getElementById("progress-bar");
-    container.style.display = "block";
-
-    let progress = 0;
-    const interval = setInterval(() => {
-        progress += Math.random() * 3;
-        if (progress > 95) progress = 95;
-        bar.style.width = progress + "%";
-    }, 500);
-
-    return () => {
-        clearInterval(interval);
-        bar.style.width = "100%";
-    };
-}
-
-document.getElementById("processForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
-
-    const submitBtn = this.querySelector("input[type=submit]");
-    submitBtn.disabled = true;
-
-    // Nasconde vecchio pulsante ZIP
-    const oldZip = document.getElementById("download-zip");
-    oldZip.style.display = "none";
-
-    const stopProgress = startSlowProgress();
-
-    const url = this.url.value;
-    const resp = await fetch("/", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `url=${encodeURIComponent(url)}`
-    });
-    const data = await resp.json();
-    const jobId = data.job_id;
-
-    // Polling per verificare completamento
-    const checkDone = setInterval(async () => {
-        const statusResp = await fetch(`/status/${jobId}`);
-        const statusData = await statusResp.json();
-        if (statusData.status === "done") {
-            clearInterval(checkDone);
-            stopProgress();
-            document.getElementById("processing").style.display = "none";
-            const downloadLink = document.getElementById("download-zip");
-            downloadLink.href = `/download/${jobId}`;
-            document.getElementById("download-container").style.display = "block";
-        }
-    }, 1000);
-});
-</script>
 </body>
 </html>
