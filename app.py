@@ -23,7 +23,12 @@ def index():
         os.makedirs(tmp_dir, exist_ok=True)
 
         # Scarica HTML
-        resp = requests.get(url)
+        try:
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+except requests.exceptions.RequestException as e:
+    return f"Errore durante il download della pagina: {e}", 400
+
         html = resp.text
 
         # Trova immagini DealerK 800x0 con estensione webp/jpg/jpeg/png
