@@ -23,9 +23,9 @@ def index():
         os.makedirs(tmp_dir, exist_ok=True)
 
         # Scarica HTML
-        try:
+try:
     resp = requests.get(url, timeout=15)
-    resp.raise_for_status()
+    resp.raise_for_status()  # solleva errori HTTP
 except requests.exceptions.RequestException as e:
     return f"Errore durante il download della pagina: {e}", 400
 
