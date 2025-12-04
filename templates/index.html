@@ -117,6 +117,17 @@ let stopProgress;
 document.getElementById("processForm").addEventListener("submit", function() {
     stopProgress = startSlowProgress();
 });
+document.getElementById("processForm").addEventListener("submit", function() {
+    // evita doppio invio
+    this.querySelector("input[type=submit]").disabled = true;
+
+    // NASCONDE eventuale pulsante ZIP precedente
+    const oldZip = document.getElementById("download-zip");
+    if (oldZip) oldZip.style.display = "none";
+
+    stopProgress = startSlowProgress();
+});
+    
 </script>
 
 </body>
