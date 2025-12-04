@@ -92,7 +92,7 @@
     </div>
 <script>
 function startSlowProgress() {
-    const container = document.getElementById("processing");  // <-- CORRETTO
+    const container = document.getElementById("processing");  // <-- FIX
     const bar = document.getElementById("progress-bar");
 
     container.style.display = "block";
@@ -100,7 +100,7 @@ function startSlowProgress() {
     let progress = 0;
 
     let interval = setInterval(() => {
-        progress += Math.random() * 3; // avanzamento lento e naturale
+        progress += Math.random() * 3; // avanza lentamente
         if (progress > 95) progress = 95;
 
         bar.style.width = progress + "%";
@@ -118,5 +118,6 @@ document.getElementById("processForm").addEventListener("submit", function() {
     stopProgress = startSlowProgress();
 });
 </script>
+
 </body>
 </html>
