@@ -3,9 +3,8 @@ services:
     name: foto-xluz
     env: python
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     envVars:
       - key: PIXELBIN_API_TOKEN
-        sync: false   # la inserisci manualmente da dashboard
-    autoDeploy: true
+        fromDatabase: true   # puoi impostare il token tramite la dashboard Render
