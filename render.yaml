@@ -1,9 +1,11 @@
 services:
   - type: web
-    name: pixelbin-app
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    name: foto-xluz
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
     envVars:
       - key: PIXELBIN_API_TOKEN
-        sync: false
+        sync: false   # la inserisci manualmente da dashboard
+    autoDeploy: true
