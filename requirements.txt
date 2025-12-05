@@ -1,5 +1,5 @@
-flask
-requests
-beautifulsoup4
-pixelbin
-gunicorn
+Flask==3.0.2
+requests==2.31.0
+beautifulsoup4==4.12.3
+pixelbin==1.1.3
+gunicorn==21.2.0
