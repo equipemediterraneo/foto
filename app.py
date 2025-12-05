@@ -20,7 +20,7 @@ pixelbin = PixelbinClient(
     })
 )
 
-MAX_IMAGES = 10
+MAX_IMAGES = 1
 
 # Funzione per scaricare pagina con retry
 def download_page(url):
