@@ -5,13 +5,7 @@ import zipfile
 import shutil
 import re
 import requests
-import asyncio
-import nest_asyncio
-
-# Abilita asyncio nested (necessario per Pixelbin su Render/Gunicorn)
-nest_asyncio.apply()
-
-# Pixelbin SDK
+from urllib.parse import urlparse
 from pixelbin import PixelbinClient, PixelbinConfig
 
 app = Flask(__name__)
@@ -28,9 +22,9 @@ pixelbin = PixelbinClient(
     })
 )
 
-MAX_IMAGES = 1  # limitazione a 1 immagine
+MAX_IMAGES = 1
 
-# Funzione per scaricare pagina HTML
+# Scarica pagina HTML
 def download_page(url):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -40,42 +34,41 @@ def download_page(url):
     resp.raise_for_status()
     return resp.text
 
-# Funzione per processare immagine con Pixelbin
+# Processa immagine con Pixelbin (sincrono)
 def process_image_with_pixelbin(local_path):
-    async def _process():
-        try:
-            with open(local_path, "rb") as f:
-                job = await pixelbin.predictions.create(
-                    name="wm_remove",
-                    input={
-                        "image": f,
-                        "rem_text": True,
-                        "rem_logo": True,
-                        "box1": "0_0_100_100",
-                        "box2": "0_0_0_0",
-                        "box3": "0_0_0_0",
-                        "box4": "0_0_0_0",
-                        "box5": "0_0_0_0"
-                    }
-                )
-
-            result = await pixelbin.predictions.wait(job._id)
-
-            if result["status"] == "SUCCESS":
-                out_url = result["output"][0]
-                r = requests.get(out_url, timeout=15)
-                r.raise_for_status()
-                return r.content
-            else:
-                print("Pixelbin prediction failed:", result.get("error"))
-                return None
-
-        except Exception as e:
-            print("Errore Pixelbin:", e)
+    try:
+        result = pixelbin.predictions.create_and_wait(
+            name="wm_remove",
+            input={
+                "image": local_path,
+                "rem_text": True,
+                "rem_logo": True,
+                "box1": "0_0_100_100",
+                "box2": "0_0_0_0",
+                "box3": "0_0_0_0",
+                "box4": "0_0_0_0",
+                "box5": "0_0_0_0"
+            }
+        )
+        if result["status"] == "SUCCESS":
+            output_url = result["output"][0]
+            r = requests.get(output_url, timeout=15)
+            r.raise_for_status()
+            return r.content
+        else:
+            print("Pixelbin failed:", result.get("error"))
             return None
+    except Exception as e:
+        print("Errore Pixelbin:", e)
+        return None
 
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(_process())
+# Estrai nome modello dall'URL (penultima cartella)
+def get_model_name(url):
+    path = urlparse(url).path.strip("/")
+    parts = path.split("/")
+    if len(parts) >= 2:
+        return parts[-2]
+    return "modello_sconosciuto"
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -84,10 +77,7 @@ def index():
         if not url:
             return "Inserisci un URL valido", 400
 
-        # Estrai nome modello dall’URL (penultima cartella)
-        slug = url.strip("/").split("/")
-        model_name = slug[-2] if len(slug) >= 2 else "modello_sconosciuto"
-
+        model_name = get_model_name(url)
         tmp_dir = os.path.join("tmp", str(uuid.uuid4()))
         os.makedirs(tmp_dir, exist_ok=True)
 
@@ -113,10 +103,6 @@ def index():
                 img_urls.append(img)
         img_urls = img_urls[:MAX_IMAGES]
 
-        if not img_urls:
-            shutil.rmtree(tmp_dir)
-            return "Nessuna immagine trovata.", 400
-
         processed_files = []
         for src in img_urls:
             try:
@@ -139,7 +125,6 @@ def index():
                     print("✅ Immagine processata:", src)
                 else:
                     print("❌ Fallita Pixelbin:", src)
-
             except Exception as e:
                 print("❌ Errore durante download o processing:", src, e)
 
@@ -147,7 +132,7 @@ def index():
             shutil.rmtree(tmp_dir)
             return "Nessuna immagine processata con successo.", 400
 
-        # Crea ZIP con nome modello
+        # Crea ZIP finale con nome modello
         zip_filename = f"{model_name}.zip"
         zip_path = os.path.join("tmp", zip_filename)
         with zipfile.ZipFile(zip_path, mode="w") as zf:
