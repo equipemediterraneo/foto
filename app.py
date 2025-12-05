@@ -6,6 +6,10 @@ import shutil
 import re
 import requests
 import asyncio
+import nest_asyncio
+
+# Abilita asyncio nested (necessario per Pixelbin su Render/Gunicorn)
+nest_asyncio.apply()
 
 # Pixelbin SDK
 from pixelbin import PixelbinClient, PixelbinConfig
@@ -36,7 +40,7 @@ def download_page(url):
     resp.raise_for_status()
     return resp.text
 
-# Funzione per processare immagine con Pixelbin (async corretto)
+# Funzione per processare immagine con Pixelbin
 def process_image_with_pixelbin(local_path):
     async def _process():
         try:
@@ -70,7 +74,8 @@ def process_image_with_pixelbin(local_path):
             print("Errore Pixelbin:", e)
             return None
 
-    return asyncio.run(_process())
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(_process())
 
 @app.route("/", methods=["GET", "POST"])
 def index():
