@@ -17,6 +17,7 @@ app = Flask(__name__)
 PIXELBIN_API_TOKEN = os.environ.get("PIXELBIN_API_TOKEN")
 if not PIXELBIN_API_TOKEN:
     raise ValueError("Variabile d'ambiente PIXELBIN_API_TOKEN non impostata")
+print("DEBUG Pixelbin token caricato:", PIXELBIN_API_TOKEN[:6] + "...")  # Log sicuro
 
 pixelbin = PixelbinClient(
     PixelbinConfig({
