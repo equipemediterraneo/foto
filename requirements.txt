@@ -3,3 +3,4 @@ requests==2.31.0
 beautifulsoup4==4.12.3
 pixelbin==4.3.0
 nest_asyncio==1.5.8
+gunicorn==21.2.0
