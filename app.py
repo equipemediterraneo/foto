@@ -1,12 +1,15 @@
-from flask import Flask, request, render_template, send_file
 import os
-import uuid
-import zipfile
-import shutil
 import re
+import uuid
+import shutil
+import zipfile
 import requests
-from urllib.parse import urlparse
+import nest_asyncio
+from flask import Flask, request, render_template, send_file
 from pixelbin import PixelbinClient, PixelbinConfig
+
+# Abilita event loop per Pixelbin async
+nest_asyncio.apply()
 
 app = Flask(__name__)
 
@@ -34,10 +37,10 @@ def download_page(url):
     resp.raise_for_status()
     return resp.text
 
-# Processa immagine con Pixelbin (sincrono)
-def process_image_with_pixelbin(local_path):
+# Processa immagine con Pixelbin
+def process_image(local_path):
     try:
-        result = pixelbin.predictions.create_and_wait(
+        job = pixelbin.predictions.create(
             name="wm_remove",
             input={
                 "image": local_path,
@@ -50,6 +53,7 @@ def process_image_with_pixelbin(local_path):
                 "box5": "0_0_0_0"
             }
         )
+        result = pixelbin.predictions.wait(job["_id"])
         if result["status"] == "SUCCESS":
             output_url = result["output"][0]
             r = requests.get(output_url, timeout=15)
@@ -62,14 +66,6 @@ def process_image_with_pixelbin(local_path):
         print("Errore Pixelbin:", e)
         return None
 
-# Estrai nome modello dall'URL (penultima cartella)
-def get_model_name(url):
-    path = urlparse(url).path.strip("/")
-    parts = path.split("/")
-    if len(parts) >= 2:
-        return parts[-2]
-    return "modello_sconosciuto"
-
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
@@ -77,14 +73,17 @@ def index():
         if not url:
             return "Inserisci un URL valido", 400
 
-        model_name = get_model_name(url)
+        # Nome modello dal penultimo segmento dell'URL
+        slug = url.strip("/").split("/")
+        model_name = slug[-2] if len(slug) >= 2 else "modello_sconosciuto"
+
         tmp_dir = os.path.join("tmp", str(uuid.uuid4()))
         os.makedirs(tmp_dir, exist_ok=True)
 
         try:
             html = download_page(url)
         except Exception as e:
-            return f"Errore durante il download della pagina: {e}", 400
+            return f"Errore download pagina: {e}", 400
 
         # Trova immagini DealerK 800x0
         all_imgs = re.findall(
@@ -94,14 +93,9 @@ def index():
         )
         all_imgs = list(dict.fromkeys(all_imgs))  # rimuove duplicati
 
-        # Preferenza WebP
-        img_urls = []
-        for img in all_imgs:
-            if img.lower().endswith(".webp"):
-                img_urls.insert(0, img)
-            else:
-                img_urls.append(img)
-        img_urls = img_urls[:MAX_IMAGES]
+        # Priorità WebP
+        img_urls = sorted(all_imgs, key=lambda x: 0 if x.lower().endswith(".webp") else 1)[:MAX_IMAGES]
+        print("DEBUG - Immagine selezionata:", img_urls)
 
         processed_files = []
         for src in img_urls:
@@ -116,15 +110,16 @@ def index():
                     f.write(r.content)
 
                 # Processa con Pixelbin
-                processed_bytes = process_image_with_pixelbin(local_path)
+                processed_bytes = process_image(local_path)
                 if processed_bytes:
-                    processed_path = os.path.join(tmp_dir, filename)
+                    processed_path = os.path.join(tmp_dir, "processed_" + filename)
                     with open(processed_path, "wb") as f:
                         f.write(processed_bytes)
                     processed_files.append(processed_path)
                     print("✅ Immagine processata:", src)
                 else:
                     print("❌ Fallita Pixelbin:", src)
+
             except Exception as e:
                 print("❌ Errore durante download o processing:", src, e)
 
@@ -132,7 +127,7 @@ def index():
             shutil.rmtree(tmp_dir)
             return "Nessuna immagine processata con successo.", 400
 
-        # Crea ZIP finale con nome modello
+        # Crea ZIP finale
         zip_filename = f"{model_name}.zip"
         zip_path = os.path.join("tmp", zip_filename)
         with zipfile.ZipFile(zip_path, mode="w") as zf:
