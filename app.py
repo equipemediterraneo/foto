@@ -32,7 +32,7 @@ pixelbin = PixelbinClient(
 )
 
 # Numero massimo immagini da elaborare
-MAX_IMAGES = 1
+MAX_IMAGES = 10
 
 # ============================
 #  FUNZIONE DOWNLOAD PAGINA
